@@ -15,7 +15,7 @@ description: "beaker-runner: example eval batch"
 repos:
   - url: https://github.com/allenai/OLMo-core
     branch: ladder-adapt
-    install: "pip install -e '.[beaker]'"
+    install: "uv sync --extra beaker"
 
 commands:
   - "echo hi"
