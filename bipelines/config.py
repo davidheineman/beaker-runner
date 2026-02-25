@@ -66,6 +66,36 @@ class BipelineConfig:
         content = f"{cmd.command}|{self.run_hash}"
         return hashlib.sha256(content.encode()).hexdigest()[:12]
 
+    def to_dict(self) -> dict:
+        """Serialize to a plain dict suitable for YAML output."""
+        d: dict = {}
+        if self.run_hash:
+            d["run_hash"] = self.run_hash
+        if self.workspace:
+            d["workspace"] = self.workspace
+        if self.local_env_dir != ".bipelines":
+            d["local_env_dir"] = self.local_env_dir
+        if self.state_dir:
+            d["state_dir"] = self.state_dir
+        if self.dry_run:
+            d["dry_run"] = self.dry_run
+        if self.repos:
+            d["repos"] = [
+                {k: v for k, v in r.__dict__.items() if v is not None and k != "name"}
+                for r in self.repos
+            ]
+        d["commands"] = [
+            {k: v for k, v in c.__dict__.items() if v is not None}
+            for c in self.commands
+        ]
+        return d
+
+    def to_yaml(self, path: str) -> str:
+        """Write this config to a YAML file and return the path."""
+        with open(path, "w") as f:
+            yaml.dump(self.to_dict(), f, default_flow_style=False, sort_keys=False)
+        return path
+
 
 def load_config_from_yaml(path: str) -> BipelineConfig:
     with open(path) as f:

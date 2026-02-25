@@ -1,5 +1,6 @@
 from bipelines.config import CommandConfig, RepoConfig, BipelineConfig
 from bipelines.bipeline import Bipeline
+from bipelines.launch import launch
 
 config = BipelineConfig(
     run_hash="debug-batch",
@@ -28,4 +29,15 @@ config = BipelineConfig(
 )
 
 bipeline = Bipeline(config)
-results = bipeline.run()
+
+# results = bipeline.run() # launch locally
+
+launch(
+    config=config,
+    workspace="ai2/adaptability",
+    budget="ai2/oe-base",
+    secrets=[
+        "BEAKER_TOKEN=DAVIDH_BEAKER_TOKEN",
+        "GITHUB_TOKEN=GITHUB_TOKEN",
+    ],
+)

@@ -1,11 +1,14 @@
 import argparse
-from typing import List, Optional
+import tempfile
+from typing import List, Optional, Union
 
 from gantry.api import Recipe
 
+from bipelines.config import BipelineConfig
+
 
 def launch(
-    config: str,
+    config: Union[str, BipelineConfig],
     workspace: str,
     budget: str,
     *,
@@ -28,7 +31,17 @@ def launch(
         if "=" not in sec:
             raise ValueError(f"Invalid secret format '{sec}', expected ENV_VAR=SECRET_NAME")
 
-    task_args = ["bipelines", "--config", config] + extra_args
+    if isinstance(config, BipelineConfig):
+        tmp = tempfile.NamedTemporaryFile(
+            suffix=".yaml", prefix="bipelines_", delete=False, mode="w"
+        )
+        config.to_yaml(tmp.name)
+        tmp.close()
+        config_path = tmp.name
+    else:
+        config_path = config
+
+    task_args = ["bipelines", "--config", config_path] + extra_args
 
     recipe = Recipe(
         args=task_args,
