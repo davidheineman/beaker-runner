@@ -27,6 +27,7 @@ recipe = Recipe(
     clusters=params.get("clusters"),
     env_vars=params.get("env_vars"),
     env_secrets=params.get("env_secrets"),
+    weka=params.get("weka"),
     yes=True,
 )
 if params.get("dry_run"):
@@ -115,6 +116,7 @@ def launch(
     budget: str,
     *,
     clusters: Optional[List[str]] = None,
+    weka: Optional[List[str]] = None,
     name: str = "bipelines",
     description: str = "bipelines parent job",
     show_logs: bool = True,
@@ -151,6 +153,7 @@ def launch(
         "workspace": workspace,
         "budget": budget,
         "clusters": clusters,
+        "weka": weka,
         "env_vars": env or None,
         "env_secrets": secrets or None,
         "show_logs": show_logs,
