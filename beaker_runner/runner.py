@@ -1,5 +1,4 @@
 import json
-import os
 import re
 import time
 from pathlib import Path
@@ -46,7 +45,6 @@ class Runner:
     def __init__(self, config: RunnerConfig):
         self.config = config
         self.beaker = Beaker.from_env()
-        self._venv_path = None
         self._workload_cache: dict[str, pb2.Workload] = {}
 
     # ── Beaker-based deduplication ──────────────────────────────────────
@@ -111,17 +109,6 @@ class Runner:
 
             time.sleep(poll_interval)
 
-    # ── Venv helpers ───────────────────────────────────────────────────
-
-    def _get_extra_env(self) -> dict:
-        """Extra env vars to inject when running commands (venv activation, etc.)."""
-        extra = {}
-        if self._venv_path:
-            venv_bin = str(self._venv_path / "bin")
-            extra["VIRTUAL_ENV"] = str(self._venv_path)
-            extra["PATH"] = f"{venv_bin}:{os.environ.get('PATH', '')}"
-        return extra
-
     # ── Main loop ──────────────────────────────────────────────────────
 
     def run(self):
@@ -144,7 +131,7 @@ class Runner:
 
         if cfg.repos:
             console.rule("[bold]Setting up local environment[/bold]")
-            self._venv_path = setup_local_env(cfg.repos, env_dir=cfg.local_env_dir)
+            setup_local_env(cfg.repos, env_dir=cfg.local_env_dir)
             console.print()
 
         self._print_task_table()
@@ -189,14 +176,12 @@ class Runner:
             console.print("  [dim]Dry run — would execute command[/dim]")
             return "dry_run"
 
-        env = self._get_extra_env()
         cwd = str(cfg.repo_dir(cmd.lib)) if cmd.lib else None
 
         console.print("  [cyan]Running locally...[/cyan]")
         try:
             exp_name, url, exp_id = run_command_and_capture_experiment(
                 command=cmd.command,
-                env=env,
                 cwd=cwd,
             )
         except RuntimeError as e:

@@ -32,38 +32,26 @@ def _find_uv() -> str | None:
     return None
 
 
+def _env_with_uv() -> dict:
+    """Return a copy of os.environ with uv's directory on PATH (if found)."""
+    env = {**os.environ}
+    uv = _find_uv()
+    if uv:
+        uv_dir = str(Path(uv).parent)
+        env["PATH"] = f"{uv_dir}:{env.get('PATH', '')}"
+    return env
+
+
 def setup_local_env(
     repos: List[RepoConfig],
     env_dir: str = ".beaker-runner",
-) -> Path:
-    """Clone repos and install them into a local virtual environment.
-
-    Returns the path to the virtual environment.
-    """
+) -> None:
+    """Clone repos and install them into the current environment."""
     env_path = Path(env_dir).resolve()
     repos_path = env_path / "repos"
-    venv_path = env_path / "venv"
-
     repos_path.mkdir(parents=True, exist_ok=True)
 
-    uv = _find_uv()
-
-    if not venv_path.exists():
-        console.print(f"💨 Creating local venv at [cyan]{venv_path}[/cyan]...")
-        if uv:
-            console.print(f"  Using [cyan]uv[/cyan] ({uv})")
-            subprocess.run([uv, "venv", str(venv_path)], check=True)
-        else:
-            console.print("  [dim]uv not found, falling back to python -m venv[/dim]")
-            subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
-
-    venv_env = {**os.environ, "VIRTUAL_ENV": str(venv_path)}
-    venv_bin = str(venv_path / "bin")
-    path_parts = [venv_bin]
-    if uv:
-        path_parts.append(str(Path(uv).parent))
-    path_parts.append(venv_env.get("PATH", ""))
-    venv_env["PATH"] = ":".join(path_parts)
+    install_env = _env_with_uv()
 
     for repo in repos:
         repo_path = repos_path / repo.name
@@ -106,8 +94,6 @@ def setup_local_env(
                 repo.install,
                 shell=True,
                 cwd=str(repo_path),
-                env=venv_env,
+                env=install_env,
                 check=True,
             )
-
-    return venv_path
