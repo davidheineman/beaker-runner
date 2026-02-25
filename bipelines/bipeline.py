@@ -150,9 +150,6 @@ class Bipeline:
             if status in ("failed", "canceled"):
                 console.print()
                 console.rule("[bold red]Pipeline aborted[/bold red]")
-                console.print(
-                    f"  Task {i + 1}/{len(cfg.commands)} {status} — skipping remaining tasks."
-                )
                 console.print()
                 failed = True
                 break
