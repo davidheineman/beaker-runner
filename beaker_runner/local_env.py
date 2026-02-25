@@ -1,5 +1,7 @@
 import os
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import List
 
@@ -10,11 +12,33 @@ from beaker_runner.config import RepoConfig
 console = Console()
 
 
+def _find_uv() -> str | None:
+    """Return the absolute path to uv, searching PATH and the active Python prefix."""
+    found = shutil.which("uv")
+    if found:
+        return found
+    prefix_uv = Path(sys.prefix) / "bin" / "uv"
+    if prefix_uv.is_file() and os.access(prefix_uv, os.X_OK):
+        return str(prefix_uv)
+    return None
+
+
+def _create_venv(venv_path: Path) -> None:
+    """Create a virtual environment using uv (preferred) or stdlib venv as fallback."""
+    uv = _find_uv()
+    if uv:
+        console.print(f"  Using [cyan]uv[/cyan] ({uv})")
+        subprocess.run([uv, "venv", str(venv_path)], check=True)
+    else:
+        console.print("  [dim]uv not found, falling back to python -m venv[/dim]")
+        subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
+
+
 def setup_local_env(
     repos: List[RepoConfig],
     env_dir: str = ".beaker-runner",
 ) -> Path:
-    """Clone repos and install them into a local uv virtual environment.
+    """Clone repos and install them into a local virtual environment.
 
     Returns the path to the virtual environment.
     """
@@ -26,7 +50,7 @@ def setup_local_env(
 
     if not venv_path.exists():
         console.print(f"💨 Creating local venv at [cyan]{venv_path}[/cyan]...")
-        subprocess.run(["uv", "venv", str(venv_path)], check=True)
+        _create_venv(venv_path)
 
     venv_env = {**os.environ, "VIRTUAL_ENV": str(venv_path)}
     venv_bin = str(venv_path / "bin")
