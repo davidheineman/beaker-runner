@@ -2,13 +2,13 @@ import argparse
 import json
 import sys
 
-from beaker_runner.config import CommandConfig, RepoConfig, RunnerConfig, load_config_from_yaml
-from beaker_runner.runner import Runner
+from bipelines.config import CommandConfig, RepoConfig, BipelineConfig, load_config_from_yaml
+from bipelines.bipeline import Bipeline
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Beaker Runner: run commands locally and poll resulting Beaker experiments",
+        description="Bipelines: run commands locally and poll resulting Beaker experiments",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -28,8 +28,8 @@ def parse_args():
     parser.add_argument(
         "--local-env-dir",
         type=str,
-        default=".beaker-runner",
-        help="Directory for local repo clones and venv (default: .beaker-runner)",
+        default=".bipelines",
+        help="Directory for local repo clones and venv (default: .bipelines)",
     )
 
     parser.add_argument(
@@ -69,7 +69,7 @@ def main():
             config.run_hash = args.run_hash
         if args.workspace:
             config.workspace = args.workspace
-        if args.local_env_dir != ".beaker-runner":
+        if args.local_env_dir != ".bipelines":
             config.local_env_dir = args.local_env_dir
     else:
         if not args.commands:
@@ -81,7 +81,7 @@ def main():
             for repo_json in args.repos:
                 repos.append(RepoConfig(**json.loads(repo_json)))
 
-        config = RunnerConfig(
+        config = BipelineConfig(
             commands=[CommandConfig(command=c) for c in args.commands],
             repos=repos,
             workspace=args.workspace,
@@ -91,8 +91,8 @@ def main():
             dry_run=args.dry_run,
         )
 
-    runner = Runner(config)
-    runner.run()
+    bipeline = Bipeline(config)
+    bipeline.run()
 
 
 if __name__ == "__main__":

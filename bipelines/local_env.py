@@ -7,7 +7,7 @@ from typing import List
 
 from rich.console import Console
 
-from beaker_runner.config import RepoConfig
+from bipelines.config import RepoConfig
 
 console = Console()
 
@@ -44,7 +44,7 @@ def _env_with_uv() -> dict:
 
 def setup_local_env(
     repos: List[RepoConfig],
-    env_dir: str = ".beaker-runner",
+    env_dir: str = ".bipelines",
 ) -> None:
     """Clone repos and install them into the current environment."""
     env_path = Path(env_dir).resolve()

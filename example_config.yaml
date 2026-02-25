@@ -7,11 +7,11 @@ repos:
     install: "uv pip install -e ."
 
 commands:
-  - command: "python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BRUNNER_HASH=1"
+  - command: "python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BIPELINES_HASH=1"
     lib: simple-job
 
-  - command: "python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BRUNNER_HASH=2"
+  - command: "python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BIPELINES_HASH=2"
     lib: simple-job
 
-  - command: "python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BRUNNER_HASH=3"
+  - command: "python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BIPELINES_HASH=3"
     lib: simple-job

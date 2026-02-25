@@ -10,7 +10,7 @@ def launch(
     budget: str,
     *,
     clusters: Optional[List[str]] = None,
-    name: str = "beaker-runner",
+    name: str = "bipelines",
     show_logs: bool = True,
     dry_run: bool = False,
     env: Optional[List[str]] = None,
@@ -28,7 +28,7 @@ def launch(
         if "=" not in sec:
             raise ValueError(f"Invalid secret format '{sec}', expected ENV_VAR=SECRET_NAME")
 
-    task_args = ["brunner", "--config", config] + extra_args
+    task_args = ["bipelines", "--config", config] + extra_args
 
     recipe = Recipe(
         args=task_args,
@@ -55,7 +55,7 @@ def main():
     parser.add_argument("--workspace", type=str, required=True)
     parser.add_argument("--budget", type=str, required=True)
     parser.add_argument("--cluster", type=str, nargs="*")
-    parser.add_argument("--name", type=str, default="beaker-runner")
+    parser.add_argument("--name", type=str, default="bipelines")
     parser.add_argument("--show-logs", action="store_true", default=True)
     parser.add_argument("--dry-run", action="store_true", default=False)
     parser.add_argument("--env", type=str, nargs="*", default=[], metavar="KEY=VALUE")
@@ -63,7 +63,7 @@ def main():
 
     parser.add_argument(
         "--config", "-c", type=str, required=True,
-        help="Path to brunner YAML config file",
+        help="Path to bipelines YAML config file",
     )
 
     args, extra = parser.parse_known_args()

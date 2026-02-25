@@ -30,8 +30,8 @@ class CommandConfig:
 
 
 @dataclass
-class RunnerConfig:
-    """Main configuration for the beaker-runner orchestrator."""
+class BipelineConfig:
+    """Main configuration for the bipelines orchestrator."""
 
     commands: List[CommandConfig]
     repos: List[RepoConfig] = field(default_factory=list)
@@ -39,7 +39,7 @@ class RunnerConfig:
     workspace: Optional[str] = None
     run_hash: str = ""
 
-    local_env_dir: str = ".beaker-runner"
+    local_env_dir: str = ".bipelines"
     state_dir: Optional[str] = None
     dry_run: bool = False
 
@@ -67,7 +67,7 @@ class RunnerConfig:
         return hashlib.sha256(content.encode()).hexdigest()[:12]
 
 
-def load_config_from_yaml(path: str) -> RunnerConfig:
+def load_config_from_yaml(path: str) -> BipelineConfig:
     with open(path) as f:
         data = yaml.safe_load(f)
 
@@ -84,6 +84,6 @@ def load_config_from_yaml(path: str) -> RunnerConfig:
             raise ValueError(f"Invalid command entry: {c!r}")
     kwargs["commands"] = commands
 
-    config = RunnerConfig(**kwargs)
+    config = BipelineConfig(**kwargs)
     config.validate()
     return config

@@ -1,7 +1,7 @@
-from beaker_runner.config import CommandConfig, RepoConfig, RunnerConfig
-from beaker_runner.runner import Runner
+from bipelines.config import CommandConfig, RepoConfig, BipelineConfig
+from bipelines.bipeline import Bipeline
 
-config = RunnerConfig(
+config = BipelineConfig(
     run_hash="debug-batch",
     workspace="ai2/adaptability",
     repos=[
@@ -13,19 +13,19 @@ config = RunnerConfig(
     ],
     commands=[
         CommandConfig(
-            command="python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BRUNNER_HASH=1",
+            command="python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BIPELINES_HASH=1",
             lib="simple-job",
         ),
         CommandConfig(
-            command="python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BRUNNER_HASH=2",
+            command="python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BIPELINES_HASH=2",
             lib="simple-job",
         ),
         CommandConfig(
-            command="python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BRUNNER_HASH=3",
+            command="python launch.py --workspace ai2/adaptability --budget ai2/oe-base --env BIPELINES_HASH=3",
             lib="simple-job",
         ),
     ],
 )
 
-runner = Runner(config)
-results = runner.run()
+bipeline = Bipeline(config)
+results = bipeline.run()

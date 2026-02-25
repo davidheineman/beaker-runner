@@ -9,17 +9,17 @@ from beaker import beaker_pb2 as pb2
 from rich.console import Console
 from rich.table import Table
 
-from beaker_runner.config import CommandConfig, RunnerConfig
-from beaker_runner.experiment import (
+from bipelines.config import CommandConfig, BipelineConfig
+from bipelines.experiment import (
     get_experiment_status,
     run_command_and_capture_experiment,
 )
-from beaker_runner.local_env import setup_local_env
+from bipelines.local_env import setup_local_env
 
 console = Console()
 
-HASH_TAG_RE = re.compile(r"\(brunner:([a-f0-9]+)\)\s*")
-HASH_TAG_SEARCH = "(brunner:"
+HASH_TAG_RE = re.compile(r"\(bipelines:([a-f0-9]+)\)\s*")
+HASH_TAG_SEARCH = "(bipelines:"
 
 WORKLOAD_STATUS_DISPLAY = {
     pb2.WorkloadStatus.STATUS_SUBMITTED: "pending",
@@ -36,13 +36,13 @@ WORKLOAD_STATUS_DISPLAY = {
 
 
 def _parse_hash_tag(description: str) -> Optional[str]:
-    """Extract the brunner task hash from a description like '(brunner:abc123) ...'."""
+    """Extract the bipelines task hash from a description like '(bipelines:abc123) ...'."""
     m = HASH_TAG_RE.match(description)
     return m.group(1) if m else None
 
 
-class Runner:
-    def __init__(self, config: RunnerConfig):
+class Bipeline:
+    def __init__(self, config: BipelineConfig):
         self.config = config
         self.beaker = Beaker.from_env()
         self._workload_cache: dict[str, pb2.Workload] = {}
@@ -50,7 +50,7 @@ class Runner:
     # ── Beaker-based deduplication ──────────────────────────────────────
 
     def _build_workload_cache(self):
-        """Pre-fetch all brunner-tagged workloads from the Beaker workspace."""
+        """Pre-fetch all bipelines-tagged workloads from the Beaker workspace."""
         self._workload_cache = {}
         if not self.config.workspace:
             return
@@ -66,7 +66,7 @@ class Runner:
             console.print(f"  [dim]Warning: could not query Beaker workspace: {e}[/dim]")
 
     def _tag_experiment(self, experiment_id: str, task_hash: str):
-        """Prepend the brunner hash tag to the experiment description, preserving any original text.
+        """Prepend the bipelines hash tag to the experiment description, preserving any original text.
 
         Idempotent: strips an existing tag before re-applying, so the job's own
         description updates are kept intact even if we re-tag periodically.
@@ -75,7 +75,7 @@ class Runner:
             workload = self.beaker.workload.get(experiment_id)
             current_desc = workload.experiment.description or ""
             original = HASH_TAG_RE.sub("", current_desc, count=1)
-            new_desc = f"(brunner:{task_hash}) {original}".rstrip()
+            new_desc = f"(bipelines:{task_hash}) {original}".rstrip()
             if new_desc != current_desc:
                 self.beaker.workload.update(workload, description=new_desc)
         except Exception as e:
@@ -111,11 +111,15 @@ class Runner:
 
     # ── Main loop ──────────────────────────────────────────────────────
 
-    def run(self):
+    def run(self) -> list[dict]:
+        """Execute all tasks and return a list of result dicts.
+
+        Each dict has keys: command, hash, status.
+        """
         cfg = self.config
 
         console.print()
-        console.print("[bold]Beaker Runner[/bold]")
+        console.print("[bold]Bipelines[/bold]")
         console.print(f"  Run hash:   {cfg.run_hash or '(none)'}")
         console.print(f"  Workspace:  {cfg.workspace or '(none — dedup disabled)'}")
         console.print(f"  Commands:   {len(cfg.commands)}")
