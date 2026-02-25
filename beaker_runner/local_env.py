@@ -12,26 +12,24 @@ from beaker_runner.config import RepoConfig
 console = Console()
 
 
+_UV_SEARCH_DIRS = [
+    Path(sys.prefix) / "bin",
+    Path.home() / ".local" / "bin",
+    Path("/usr/local/bin"),
+    Path.home() / ".cargo" / "bin",
+]
+
+
 def _find_uv() -> str | None:
-    """Return the absolute path to uv, searching PATH and the active Python prefix."""
+    """Return the absolute path to uv, searching PATH then common install locations."""
     found = shutil.which("uv")
     if found:
         return found
-    prefix_uv = Path(sys.prefix) / "bin" / "uv"
-    if prefix_uv.is_file() and os.access(prefix_uv, os.X_OK):
-        return str(prefix_uv)
+    for d in _UV_SEARCH_DIRS:
+        candidate = d / "uv"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
     return None
-
-
-def _create_venv(venv_path: Path) -> None:
-    """Create a virtual environment using uv (preferred) or stdlib venv as fallback."""
-    uv = _find_uv()
-    if uv:
-        console.print(f"  Using [cyan]uv[/cyan] ({uv})")
-        subprocess.run([uv, "venv", str(venv_path)], check=True)
-    else:
-        console.print("  [dim]uv not found, falling back to python -m venv[/dim]")
-        subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
 
 
 def setup_local_env(
@@ -48,13 +46,24 @@ def setup_local_env(
 
     repos_path.mkdir(parents=True, exist_ok=True)
 
+    uv = _find_uv()
+
     if not venv_path.exists():
         console.print(f"💨 Creating local venv at [cyan]{venv_path}[/cyan]...")
-        _create_venv(venv_path)
+        if uv:
+            console.print(f"  Using [cyan]uv[/cyan] ({uv})")
+            subprocess.run([uv, "venv", str(venv_path)], check=True)
+        else:
+            console.print("  [dim]uv not found, falling back to python -m venv[/dim]")
+            subprocess.run([sys.executable, "-m", "venv", str(venv_path)], check=True)
 
     venv_env = {**os.environ, "VIRTUAL_ENV": str(venv_path)}
     venv_bin = str(venv_path / "bin")
-    venv_env["PATH"] = f"{venv_bin}:{venv_env.get('PATH', '')}"
+    path_parts = [venv_bin]
+    if uv:
+        path_parts.append(str(Path(uv).parent))
+    path_parts.append(venv_env.get("PATH", ""))
+    venv_env["PATH"] = ":".join(path_parts)
 
     for repo in repos:
         repo_path = repos_path / repo.name
