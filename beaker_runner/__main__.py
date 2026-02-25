@@ -2,13 +2,13 @@ import argparse
 import json
 import sys
 
-from beaker_runner.config import RunnerConfig, RepoConfig, load_config_from_yaml
+from beaker_runner.config import CommandConfig, RepoConfig, RunnerConfig, load_config_from_yaml
 from beaker_runner.runner import Runner
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Beaker Runner: sequential CPU job orchestrator with deduplication",
+        description="Beaker Runner: run commands locally and poll resulting Beaker experiments",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -25,30 +25,31 @@ def parse_args():
         dest="repos",
         help='Repo config as JSON: \'{"url":"...","branch":"main","install":"..."}\'',
     )
-
-    parser.add_argument("--workspace", "-w", type=str, default="ai2/adaptability")
-    parser.add_argument("--cluster", action="append", dest="clusters")
-    parser.add_argument("--budget", type=str, default="ai2/oe-base")
-    parser.add_argument("--image", type=str, default="ai2/cuda12.8-dev-ubuntu22.04-torch2.7.1")
     parser.add_argument(
-        "--priority", type=str, default="normal", choices=["urgent", "high", "normal", "low"]
+        "--local-env-dir",
+        type=str,
+        default=".beaker-runner",
+        help="Directory for local repo clones and venv (default: .beaker-runner)",
     )
-    parser.add_argument("--preemptible", action="store_true", default=False)
 
     parser.add_argument(
         "--run-hash", type=str, default="", help="Unique identifier for this batch of tasks"
     )
-    parser.add_argument("--experiment-prefix", type=str, default="beaker-runner")
-    parser.add_argument("--description", type=str, default="beaker-runner sequential task")
+    parser.add_argument(
+        "--hash-env-var",
+        type=str,
+        default="BEAKER_RUNNER_HASH",
+        help="Env var name to inject the task hash into commands (default: BEAKER_RUNNER_HASH)",
+    )
 
     parser.add_argument(
-        "--state-dir", type=str, default=None, help="Directory to save/load state for resume"
+        "--state-dir", type=str, default=None, help="Directory to save run artifacts"
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
         default=False,
-        help="Show what would happen without launching",
+        help="Show what would happen without executing",
     )
 
     return parser.parse_args()
@@ -60,13 +61,17 @@ def main():
     if args.config:
         config = load_config_from_yaml(args.config)
         if args.commands:
-            config.commands = args.commands
+            config.commands = [CommandConfig(command=c) for c in args.commands]
         if args.dry_run:
             config.dry_run = True
         if args.state_dir:
             config.state_dir = args.state_dir
         if args.run_hash:
             config.run_hash = args.run_hash
+        if args.local_env_dir != ".beaker-runner":
+            config.local_env_dir = args.local_env_dir
+        if args.hash_env_var != "BEAKER_RUNNER_HASH":
+            config.hash_env_var = args.hash_env_var
     else:
         if not args.commands:
             print("Error: provide at least one --command or use --config", file=sys.stderr)
@@ -78,17 +83,11 @@ def main():
                 repos.append(RepoConfig(**json.loads(repo_json)))
 
         config = RunnerConfig(
-            commands=args.commands,
+            commands=[CommandConfig(command=c) for c in args.commands],
             repos=repos,
-            workspace=args.workspace,
-            clusters=args.clusters or ["ai2/saturn"],
-            budget=args.budget,
-            image=args.image,
-            priority=args.priority,
-            preemptible=args.preemptible,
             run_hash=args.run_hash,
-            experiment_prefix=args.experiment_prefix,
-            description=args.description,
+            hash_env_var=args.hash_env_var,
+            local_env_dir=args.local_env_dir,
             state_dir=args.state_dir,
             dry_run=args.dry_run,
         )

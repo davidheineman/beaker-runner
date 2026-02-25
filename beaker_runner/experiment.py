@@ -1,148 +1,74 @@
+import os
+import re
+import subprocess
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Optional, Tuple
 
-from beaker import (
-    Beaker,
-    BeakerConstraints,
-    BeakerDataMount,
-    BeakerDataSource,
-    BeakerEnvVar,
-    BeakerExperimentSpec,
-    BeakerImageSource,
-    BeakerJobPriority,
-    BeakerResultSpec,
-    BeakerTaskContext,
-    BeakerTaskResources,
-    BeakerTaskSpec,
-    BeakerWorkloadStatus,
-    BeakerWorkloadType,
-)
-from cuvette.constants.secrets import USER_ENV_SECRETS, USER_FILE_SECRETS
+from beaker import Beaker, BeakerWorkloadStatus
 from rich.console import Console
 
 console = Console()
 
-WEKA_MOUNTS = [
-    BeakerDataMount(mount_path="/oe-eval-default", source=BeakerDataSource(weka="oe-eval-default")),
-    BeakerDataMount(
-        mount_path="/oe-training-default", source=BeakerDataSource(weka="oe-training-default")
-    ),
-    BeakerDataMount(
-        mount_path="/oe-adapt-default", source=BeakerDataSource(weka="oe-adapt-default")
-    ),
-]
-
-PRIORITY_MAP = {
-    "urgent": BeakerJobPriority.urgent,
-    "high": BeakerJobPriority.high,
-    "normal": BeakerJobPriority.normal,
-    "low": BeakerJobPriority.low,
-}
+EXPERIMENT_RE = re.compile(r"Experiment:\s+(\S+)\s+→\s+(https://beaker\.org/ex/(\S+))")
 
 
-def _build_datasets() -> List[BeakerDataMount]:
-    datasets = list(WEKA_MOUNTS)
-
-    dst_seen: set[str] = set()
-    for secret in USER_FILE_SECRETS:
-        mount_path = f"/root/{secret['path']}"
-        if mount_path in dst_seen:
-            continue
-        dst_seen.add(mount_path)
-        datasets.append(
-            BeakerDataMount(mount_path=mount_path, source=BeakerDataSource(secret=secret["name"]))
-        )
-
-    return datasets
+def parse_experiment_line(line: str) -> Optional[Tuple[str, str, str]]:
+    """Parse 'Experiment: name → url' returning (name, url, experiment_id), or None."""
+    m = EXPERIMENT_RE.search(line)
+    if m:
+        return m.group(1), m.group(2), m.group(3)
+    return None
 
 
-def _build_env_vars() -> List[BeakerEnvVar]:
-    return [BeakerEnvVar(name=s["env"], secret=s["name"]) for s in USER_ENV_SECRETS]
+def run_command_and_capture_experiment(
+    command: str,
+    env: Optional[dict] = None,
+    cwd: Optional[str] = None,
+) -> Tuple[str, str, str]:
+    """Run a command locally, streaming output and capturing the experiment line.
 
-
-def create_experiment(
-    beaker: Beaker,
-    name: str,
-    script: str,
-    workspace: str,
-    clusters: List[str],
-    budget: str,
-    image: str,
-    priority: str = "normal",
-    preemptible: bool = False,
-    description: str = "",
-):
-    """Create a CPU experiment on Beaker (0 GPUs, weka mounts, user secrets)."""
-    task = BeakerTaskSpec(
-        name=name,
-        image=BeakerImageSource(beaker=image),
-        command=["bash", "-c", script],
-        host_networking=True,
-        result=BeakerResultSpec(path="/output"),
-        datasets=_build_datasets(),
-        env_vars=_build_env_vars(),
-        constraints=BeakerConstraints(cluster=clusters),
-        context=BeakerTaskContext(
-            priority=PRIORITY_MAP[priority],
-            preemptible=preemptible,
-        ),
-        resources=BeakerTaskResources(gpu_count=0),
-    )
-
-    spec = BeakerExperimentSpec(
-        tasks=[task],
-        description=description,
-        budget=budget,
-    )
-
-    workload = beaker.experiment.create(spec=spec, name=name, workspace=workspace)
-    return workload
-
-
-def list_recent_experiments(
-    beaker: Beaker,
-    workspace: str,
-    limit: int = 1000,
-) -> Dict[str, dict]:
+    Returns (experiment_name, url, experiment_id).
+    Raises RuntimeError if the command fails or no experiment line is found.
     """
-    Pull recent experiments from the workspace and return a name -> info lookup.
-    Used for dedup: if an experiment with matching name exists, we can skip or hook to it.
-    """
-    console.print(f"  Pulling last {limit} experiments from [cyan]{workspace}[/cyan]...")
+    merged_env = {**os.environ, **(env or {})}
 
-    workspace_obj = beaker.workspace.get(workspace)
-    user = beaker.user.get(beaker.user_name)
-
-    workloads = list(
-        beaker.workload.list(
-            workspace=workspace_obj,
-            author=user,
-            workload_type=BeakerWorkloadType.experiment,
-            limit=limit,
-        )
+    proc = subprocess.Popen(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=merged_env,
+        cwd=cwd,
     )
 
-    lookup: Dict[str, dict] = {}
-    for workload in workloads:
-        if not beaker.workload.is_experiment(workload):
-            continue
-        exp = workload.experiment
-        name = getattr(exp, "name", None)
-        if name:
-            lookup[name] = {"workload": workload, "experiment": exp}
+    experiment_info = None
+    for line in proc.stdout:
+        stripped = line.rstrip("\n")
+        console.print(f"  [dim]{stripped}[/dim]")
+        if experiment_info is None:
+            parsed = parse_experiment_line(stripped)
+            if parsed:
+                experiment_info = parsed
 
-    console.print(f"  Found [green]{len(lookup)}[/green] named experiments")
-    return lookup
+    proc.wait()
+
+    if proc.returncode != 0:
+        raise RuntimeError(f"Command exited with code {proc.returncode}")
+
+    if experiment_info is None:
+        raise RuntimeError("No 'Experiment: ... → ...' line found in command output")
+
+    return experiment_info
 
 
-def get_workload_status(beaker: Beaker, workload) -> Tuple[str, Optional[object]]:
-    """Return (status_string, job_or_None) for a workload."""
+def get_experiment_status(beaker: Beaker, experiment_id: str) -> str:
+    """Get the current status of a Beaker experiment by ID."""
+    workload = beaker.workload.get(experiment_id)
     job = beaker.workload.get_latest_job(workload)
 
     if job is None:
-        return "pending", None
-
-    status = job.status.status
+        return "pending"
 
     STATUS_MAP = {
         BeakerWorkloadStatus.running: "running",
@@ -150,20 +76,19 @@ def get_workload_status(beaker: Beaker, workload) -> Tuple[str, Optional[object]
         BeakerWorkloadStatus.failed: "failed",
         BeakerWorkloadStatus.canceled: "canceled",
     }
+    return STATUS_MAP.get(job.status.status, "unknown")
 
-    return STATUS_MAP.get(status, "unknown"), job
 
-
-def wait_for_completion(
+def wait_for_experiment(
     beaker: Beaker,
-    workload,
+    experiment_id: str,
     poll_interval: float = 15.0,
 ) -> str:
-    """Poll a workload until it reaches a terminal state. Returns final status string."""
+    """Poll a Beaker experiment until it reaches a terminal state. Returns final status."""
     last_status = None
 
     while True:
-        status, _ = get_workload_status(beaker, workload)
+        status = get_experiment_status(beaker, experiment_id)
 
         if status != last_status:
             console.print(f"  Status: [yellow]{status}[/yellow]")
@@ -173,45 +98,3 @@ def wait_for_completion(
             return status
 
         time.sleep(poll_interval)
-
-
-def find_matching_experiment(
-    experiment_lookup: Dict[str, dict],
-    experiment_prefix: str,
-    task_hash: str,
-) -> Optional[str]:
-    """
-    Find the best matching experiment name for a given task hash.
-    Checks base name and retry suffixes (e.g. beaker-runner-{hash}, beaker-runner-{hash}-1, ...).
-    Returns the name, or None if not found.
-    """
-    base_name = f"{experiment_prefix}-{task_hash}"
-
-    latest_match = base_name if base_name in experiment_lookup else None
-
-    n = 1
-    while True:
-        retry_name = f"{base_name}-{n}"
-        if retry_name in experiment_lookup:
-            latest_match = retry_name
-            n += 1
-        else:
-            break
-
-    return latest_match
-
-
-def next_experiment_name(
-    experiment_lookup: Dict[str, dict],
-    experiment_prefix: str,
-    task_hash: str,
-) -> str:
-    """Generate the next available experiment name (handles retries after failures)."""
-    base_name = f"{experiment_prefix}-{task_hash}"
-    if base_name not in experiment_lookup:
-        return base_name
-
-    n = 1
-    while f"{base_name}-{n}" in experiment_lookup:
-        n += 1
-    return f"{base_name}-{n}"
