@@ -97,7 +97,10 @@ def main():
         )
 
     bipeline = Bipeline(config)
-    bipeline.run()
+    results = bipeline.run()
+
+    if any(r["status"] in ("failed", "canceled") for r in results):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

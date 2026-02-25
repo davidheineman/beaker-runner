@@ -141,13 +141,26 @@ class Bipeline:
         self._print_task_table()
 
         results = []
+        failed = False
         for i, cmd in enumerate(cfg.commands):
             task_hash = cfg.task_hash(cmd)
             status = self._process_task(i, cmd, task_hash)
             results.append({"command": cmd.command, "hash": task_hash, "status": status})
 
-        console.print()
-        console.rule("[bold green]All tasks processed[/bold green]")
+            if status in ("failed", "canceled"):
+                console.print()
+                console.rule("[bold red]Pipeline aborted[/bold red]")
+                console.print(
+                    f"  Task {i + 1}/{len(cfg.commands)} {status} — skipping remaining tasks."
+                )
+                console.print()
+                failed = True
+                break
+
+        if not failed:
+            console.print()
+            console.rule("[bold green]All tasks completed[/bold green]")
+
         completed = sum(1 for r in results if r["status"] == "completed")
         console.print(f"  Completed: {completed}/{len(cfg.commands)}")
         console.print()
