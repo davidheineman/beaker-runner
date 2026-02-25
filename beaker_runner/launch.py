@@ -1,6 +1,52 @@
 import argparse
+from typing import List, Optional
 
 from gantry.api import Recipe
+
+
+def launch(
+    config: str,
+    workspace: str,
+    budget: str,
+    *,
+    clusters: Optional[List[str]] = None,
+    name: str = "beaker-runner",
+    show_logs: bool = True,
+    dry_run: bool = False,
+    env: Optional[List[str]] = None,
+    secrets: Optional[List[str]] = None,
+    extra_args: Optional[List[str]] = None,
+) -> Recipe:
+    env = env or []
+    secrets = secrets or []
+    extra_args = extra_args or []
+
+    for ev in env:
+        if "=" not in ev:
+            raise ValueError(f"Invalid env var format '{ev}', expected KEY=VALUE")
+    for sec in secrets:
+        if "=" not in sec:
+            raise ValueError(f"Invalid secret format '{sec}', expected ENV_VAR=SECRET_NAME")
+
+    task_args = ["brunner", "--config", config] + extra_args
+
+    recipe = Recipe(
+        args=task_args,
+        name=name,
+        workspace=workspace,
+        budget=budget,
+        clusters=clusters,
+        env_vars=env or None,
+        env_secrets=secrets or None,
+        yes=True,
+    )
+
+    if dry_run:
+        recipe.dry_run()
+    else:
+        recipe.launch(show_logs=show_logs)
+
+    return recipe
 
 
 def main():
@@ -22,31 +68,18 @@ def main():
 
     args, extra = parser.parse_known_args()
 
-    for ev in args.env:
-        if "=" not in ev:
-            parser.error(f"Invalid env var format '{ev}', expected KEY=VALUE")
-
-    for sec in args.secret:
-        if "=" not in sec:
-            parser.error(f"Invalid secret format '{sec}', expected ENV_VAR=SECRET_NAME")
-
-    task_args = ["brunner", "--config", args.config] + extra
-
-    recipe = Recipe(
-        args=task_args,
-        name=args.name,
+    launch(
+        config=args.config,
         workspace=args.workspace,
         budget=args.budget,
         clusters=args.cluster,
-        env_vars=args.env or None,
-        env_secrets=args.secret or None,
-        yes=True,
+        name=args.name,
+        show_logs=args.show_logs,
+        dry_run=args.dry_run,
+        env=args.env,
+        secrets=args.secret,
+        extra_args=extra,
     )
-
-    if args.dry_run:
-        recipe.dry_run()
-    else:
-        recipe.launch(show_logs=args.show_logs)
 
 
 if __name__ == "__main__":

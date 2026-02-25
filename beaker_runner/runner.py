@@ -154,6 +154,8 @@ class Runner:
                 {"run_hash": cfg.run_hash, "tasks": results},
             )
 
+        return results
+
     # ── Per-task logic ─────────────────────────────────────────────────
 
     def _process_task(self, index: int, cmd: CommandConfig, task_hash: str) -> str:
