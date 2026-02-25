@@ -94,14 +94,15 @@ def _ensure_launch_env(base_dir: str = ".bipelines") -> tuple[Path, str]:
             )
 
         console.print("[dim]Installing bipelines into launch venv...[/dim]")
+        bipelines_pkg = "bipelines @ git+https://github.com/davidheineman/bipelines.git"
         if uv:
             subprocess.run(
-                [uv, "pip", "install", "--python", venv_python, "bipelines"],
+                [uv, "pip", "install", "--python", venv_python, bipelines_pkg],
                 check=True, **devnull,
             )
         else:
             subprocess.run(
-                [venv_python, "-m", "pip", "install", "bipelines"],
+                [venv_python, "-m", "pip", "install", bipelines_pkg],
                 check=True, **devnull,
             )
 
@@ -161,10 +162,15 @@ def launch(
         input=json.dumps(params),
         text=True,
         cwd=str(repo_path),
+        capture_output=True,
     )
 
     if proc.returncode != 0:
+        print("==== Launch failed ====")
+        print("stdout:\n", proc.stdout)
+        print("stderr:\n", proc.stderr)
         raise RuntimeError(f"Launch failed with exit code {proc.returncode}")
+
 
 
 def main():
