@@ -2,7 +2,7 @@
 
 ## bipelines
 
-chain together beaker commands with pipelines for beaker!
+chain together beaker commands with bipelines: pipelines for beaker!
 
 ### quick start
 
