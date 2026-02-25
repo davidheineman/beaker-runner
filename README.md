@@ -1,4 +1,8 @@
-chain together beaker commands with beaker runner!
+<img width="150" alt="pipeline" src="https://github.com/user-attachments/assets/e56b5a0e-0c71-4ee9-86c6-767540903664" />
+
+## bipelines
+
+chain together beaker commands with pipelines for beaker!
 
 ### quick start
 
