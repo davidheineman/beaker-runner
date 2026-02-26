@@ -19,13 +19,22 @@ def sprint(*args, **kwargs):
 
 
 EXPERIMENT_RE = re.compile(r"Experiment:\s+(\S+)\s+→\s+(https://beaker\.org/ex/(\S+))")
+EXPERIMENT_SUBMITTED_RE = re.compile(r"Experiment submitted, see progress at\s+(https://beaker\.org/ex/(\S+))")
 
 
 def parse_experiment_line(line: str) -> Optional[Tuple[str, str, str]]:
-    """Parse 'Experiment: name → url' returning (name, url, experiment_id), or None."""
+    """Parse an experiment line returning (name, url, experiment_id), or None.
+
+    Supports two formats:
+      Experiment: <name> → <url>
+      Experiment submitted, see progress at <url>
+    """
     m = EXPERIMENT_RE.search(line)
     if m:
         return m.group(1), m.group(2), m.group(3)
+    m = EXPERIMENT_SUBMITTED_RE.search(line)
+    if m:
+        return m.group(2), m.group(1), m.group(2)
     return None
 
 
