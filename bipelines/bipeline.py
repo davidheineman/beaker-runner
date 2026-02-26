@@ -14,7 +14,7 @@ from bipelines.experiment import (
     get_experiment_status,
     run_command_and_capture_experiment,
 )
-from bipelines.local_env import setup_local_env
+from bipelines.local_env import setup_local_env, repo_venv_env
 
 console = Console()
 
@@ -193,11 +193,13 @@ class Bipeline:
             return "dry_run"
 
         cwd = str(cfg.repo_dir(cmd.lib)) if cmd.lib else None
+        env = repo_venv_env(cfg.repo_dir(cmd.lib)) if cmd.lib else None
 
         console.print("  [cyan]Running locally...[/cyan]")
         try:
             exp_name, url, exp_id = run_command_and_capture_experiment(
                 command=cmd.command,
+                env=env,
                 cwd=cwd,
             )
         except RuntimeError as e:

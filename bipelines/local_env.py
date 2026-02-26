@@ -42,16 +42,26 @@ def _env_with_uv() -> dict:
     return env
 
 
+def repo_venv_env(repo_path: Path) -> dict:
+    """Return an env dict that activates the venv at repo_path/.venv."""
+    venv_path = repo_path / ".venv"
+    env = _env_with_uv()
+    env["VIRTUAL_ENV"] = str(venv_path)
+    env["PATH"] = f"{venv_path / 'bin'}:{env['PATH']}"
+    env.pop("PYTHONHOME", None)
+    return env
+
+
 def setup_local_env(
     repos: List[RepoConfig],
     env_dir: str = ".bipelines",
 ) -> None:
-    """Clone repos and install them into the current environment."""
+    """Clone repos and install each into its own isolated venv."""
     env_path = Path(env_dir).resolve()
     repos_path = env_path / "repos"
     repos_path.mkdir(parents=True, exist_ok=True)
 
-    install_env = _env_with_uv()
+    base_env = _env_with_uv()
 
     for repo in repos:
         repo_path = repos_path / repo.name
@@ -88,12 +98,23 @@ def setup_local_env(
                 check=True,
             )
 
+        venv_path = repo_path / ".venv"
+        if not venv_path.exists():
+            console.print(f"  Creating venv for [cyan]{repo.name}[/cyan]...")
+            uv = _find_uv() or "uv"
+            subprocess.run(
+                [uv, "venv", str(venv_path)],
+                cwd=str(repo_path),
+                env=base_env,
+                check=True,
+            )
+
         if repo.install:
             console.print(f"  Installing [cyan]{repo.name}[/cyan]: {repo.install}")
             subprocess.run(
                 repo.install,
                 shell=True,
                 cwd=str(repo_path),
-                env=install_env,
+                env=repo_venv_env(repo_path),
                 check=True,
             )
